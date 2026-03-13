@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Utilisateurs — Gestion Livraison</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0b0c10;
+    --surface: #12141a;
+    --border: #1e2130;
+    --client: #00d4aa;
+    --client-dim: rgba(0,212,170,0.12);
+    --admin: #ff6b35;
+    --admin-dim: rgba(255,107,53,0.12);
+    --neutral: #2a2d3e;
+    --text: #e8eaf6;
+    --text-dim: #6b7080;
+    --arrow: #3a3f55;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    padding: 40px 20px 60px;
+    background-image:
+      radial-gradient(ellipse 60% 40% at 20% 10%, rgba(0,212,170,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 80% 90%, rgba(255,107,53,0.06) 0%, transparent 60%);
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 60px;
+  }
+
+  header .label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  header h1 {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 800;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, var(--client) 0%, #66e0c8 40%, var(--admin) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin-top: 20px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+
+  /* LAYOUT */
+  .flows {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr;
+    gap: 0;
+    max-width: 1100px;
+    margin: 0 auto;
+    align-items: start;
+  }
+
+  .column-header {
+    text-align: center;
+    padding: 14px 20px;
+    border-radius: 12px 12px 0 0;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .col-client .column-header { background: var(--client-dim); color: var(--client); border: 1px solid rgba(0,212,170,0.25); }
+  .col-admin .column-header  { background: var(--admin-dim);  color: var(--admin);  border: 1px solid rgba(255,107,53,0.25); }
+
+  /* NODES */
+  .node {
+    position: relative;
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    border-left: 3px solid;
+    transition: transform 0.15s;
+    animation: fadeUp 0.4s both;
+  }
+
+  .node:hover { transform: translateX(4px); }
+
+  .col-client .node { border-color: var(--client); }
+  .col-admin  .node { border-color: var(--admin);  }
+
+  .node-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+
+  .node-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .node-badge {
+    position: absolute;
+    top: 10px; right: 12px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .badge-page  { background: rgba(255,255,255,0.05); color: var(--text-dim); }
+  .badge-api   { background: rgba(90,120,255,0.15);  color: #8899ff; }
+  .badge-auth  { background: rgba(255,220,0,0.12);   color: #ffd700; }
+  .badge-guard { background: rgba(255,100,100,0.12); color: #ff8888; }
+
+  /* ARROWS */
+  .arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 0;
+    color: var(--arrow);
+    font-size: 18px;
+  }
+
+  .col-client .arrow { color: rgba(0,212,170,0.4); }
+  .col-admin  .arrow { color: rgba(255,107,53,0.4); }
+
+  /* CENTER COLUMN */
+  .col-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 58px;
+    gap: 0;
+  }
+
+  .shared-node {
+    background: var(--neutral);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    width: 52px;
+    margin-bottom: 8px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .center-line {
+    width: 1px;
+    background: var(--border);
+    flex: 1;
+    min-height: 20px;
+  }
+
+  /* SECTION SEPARATORS */
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    padding: 10px 0 6px;
+    border-top: 1px dashed var(--border);
+    margin-top: 6px;
+    margin-bottom: 2px;
+  }
+
+  .node-group {
+    background: rgba(255,255,255,0.02);
+    border-radius: 10px;
+    padding: 10px 10px 4px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+  }
+
+  .node-group-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .col-client .node-group-title { color: var(--client); }
+  .col-admin  .node-group-title { color: var(--admin);  }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .col-client .node:nth-child(1)  { animation-delay: 0.05s; }
+  .col-client .node:nth-child(2)  { animation-delay: 0.10s; }
+  .col-client .node:nth-child(3)  { animation-delay: 0.15s; }
+  .col-admin  .node:nth-child(1)  { animation-delay: 0.05s; }
+  .col-admin  .node:nth-child(2)  { animation-delay: 0.10s; }
+
+  /* VIDEO SECTION */
+  .video-section {
+    max-width: 780px;
+    margin: 60px auto 0;
+    text-align: center;
+  }
+
+  .video-section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 18px;
+  }
+
+  .video-wrapper {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px dashed rgba(255,255,255,0.12);
+    background: var(--surface);
+    position: relative;
+  }
+
+  .video-placeholder {
+    aspect-ratio: 16/9;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background:
+      radial-gradient(ellipse 60% 50% at 50% 50%, rgba(0,212,170,0.05) 0%, transparent 70%),
+      var(--surface);
+    position: relative;
+  }
+
+  .video-placeholder::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 20px,
+      rgba(255,255,255,0.012) 20px,
+      rgba(255,255,255,0.012) 21px
+    );
+  }
+
+  .video-icon {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--client), var(--admin));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #0b0c10;
+    box-shadow: 0 0 40px rgba(0,212,170,0.25);
+    animation: pulse 2.5s ease-in-out infinite;
+    padding-left: 4px;
+    z-index: 1;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 30px rgba(0,212,170,0.2); }
+    50%       { box-shadow: 0 0 55px rgba(0,212,170,0.45); }
+  }
+
+  .video-text {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.3px;
+    z-index: 1;
+  }
+
+  .video-subtext {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    z-index: 1;
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 50px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="label">Architecture applicative</div>
+  <h1>Flux Utilisateurs — Gestion Livraison</h1>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--client)"></div>Client</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--admin)"></div>Admin</div>
+  </div>
+</header>
+
+<div class="flows">
+
+  <!-- CLIENT COLUMN -->
+  <div class="col-client">
+    <div class="column-header">👤 Flux Client</div>
+
+    <!-- AUTH -->
+    <div class="node-group">
+      <div class="node-group-title">🔐 Authentification</div>
+      <div class="node">
+        <span class="node-badge badge-page">PAGE</span>
+        <div class="node-title">Login / Register</div>
+        <div class="node-desc">Connexion ou création de compte<br>JWT stocké côté client</div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="node">
+        <span class="node-badge badge-auth">JWT</span>
+        <div class="node-title">Token d'accès émis</div>
+        <div class="node-desc">POST /api/auth/login<br>POST /api/auth/register</div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="node-group">
+      <div class="node-group-title">🏠 Dashboard</div>
+      <div class="node">
+        <span class="node-badge badge-page">PAGE</span>
+        <div class="node-title">Dashboard.tsx</div>
+        <div class="node-desc">Vue d'ensemble des livraisons<br>Statuts en temps réel</div>
+      </div>
+      <div class="arrow">↓</div>
+    </div>
+
+    <!-- LIVRAISON -->
+    <div class="node-group">
+      <div class="node-group-title">📦 Gestion Livraison</div>
+      <div class="node">
+        <span class="node-badge badge-page">PAGE</span>
+        <div class="node-title">NewDelivery.tsx</div>
+        <div class="node-desc">Créer une nouvelle demande<br>POST /api/deliveries</div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="node">
+        <span class="node-badge badge-page">PAGE</span>
+        <div class="node-title">TrackDelivery.tsx</div>
+        <div class="node-desc">Suivi en temps réel<br>GET /api/deliveries/:id</div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="node">
+        <span class="node-badge badge-api">API</span>
+        <div class="node-title">Historique livraisons</div>
+        <div class="node-desc">GET /api/deliveries/me<br>Filtres : statut, date</div>
+      </div>
+    </div>
+
+    <!-- PROFIL -->
+    <div class="node-group">
+      <div class="node-group-title">👤 Profil</div>
+      <div class="node">
+        <span class="node-badge badge-page">PAGE</span>
+        <div class="node-title">Profile.tsx</div>
+        <div class="node-desc">Modifier infos personnelles<br>PUT /api/users/me</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="col-center">
+    <div class="center-line"></div>
+    <div class="shared-node">API<br>Node.js</div>
+    <div class="center-line"></div>
+    <div class="shared-node">Mongo<br>Atlas</div>
+    <div class="center-line"></div>
+    <div class="shared-node">AUTH<br>Guard</div>
+    <div class="center-line"></div>
+    <div class="shared-node">Route<br>Guard</div>
+    <div class="center-line"></div>
+  </div>
+
+  <!-- ADMIN COLUMN -->
+  <div class="col-admin">
+    <div class="column-header">🛡️ Flux Admin</div>
+
+    <!-- AUTH -->
+    <div class="node-group">
+      <div class="node-group-title">🔐 Authentification</div>
+      <div class="node">
+        <span class="node-badge badge-auth">JWT</span>
+        <div class="node-title">Login Admin</div>
+        <div class="node-desc">Même endpoint /api/auth/login<br>Rôle "admin" dans le token</div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="node">
+        <span class="node-badge badge-guard">GUARD</span>
+        <div class="node-title">Middleware isAdmin</div>
+        <div class="node-desc">Vérifie req.user.role === 'admin'<br>Bloque si non autorisé</div>
+      </div>
+    </div>
+
+    <!-- ADMIN PANEL -->
+    <div class="node-group">
+      <div class="node-group-title">⚙️ Panneau Admin</div>
+      <div class="node">
+        <span class="node-badge badge-page">PAGE</span>
+        <div class="node-title">AdminPanel.tsx</div>
+        <div class="node-desc">Vue centrale de gestion<br>Toutes les livraisons + utilisateurs</div>
+      </div>
+      <div class="arrow">↓</div>
+    </div>
+
+    <!-- GESTION LIVRAISONS -->
+    <div class="node-group">
+      <div class="node-group-title">📦 Gestion Livraisons</div>
+      <div class="node">
+        <span class="node-badge badge-api">API</span>
+        <div class="node-title">Toutes les livraisons</div>
+        <div class="node-desc">GET /api/deliveries (all)<br>Aucun filtre par user</div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="node">
+        <span class="node-badge badge-api">API</span>
+        <div class="node-title">Modifier statut livraison</div>
+        <div class="node-desc">PUT /api/deliveries/:id<br>en_cours → livré → annulé</div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="node">
+        <span class="node-badge badge-api">API</span>
+        <div class="node-title">Supprimer livraison</div>
+        <div class="node-desc">DELETE /api/deliveries/:id</div>
+      </div>
+    </div>
+
+    <!-- GESTION USERS -->
+    <div class="node-group">
+      <div class="node-group-title">👥 Gestion Utilisateurs</div>
+      <div class="node">
+        <span class="node-badge badge-api">API</span>
+        <div class="node-title">Liste utilisateurs</div>
+        <div class="node-desc">GET /api/users<br>Accessible admin uniquement</div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="node">
+        <span class="node-badge badge-api">API</span>
+        <div class="node-title">Modifier / Supprimer user</div>
+        <div class="node-desc">PUT /api/users/:id<br>DELETE /api/users/:id</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- VIDEO SECTION -->
+<div class="video-section">
+  <div class="video-section-label">🎬 Présentation Vidéo du Projet</div>
+  <div class="video-wrapper">
+    <div class="video-placeholder">
+      <div class="video-icon">▶</div>
+      <div class="video-text">Votre vidéo ici</div>
+      <div class="video-subtext">Remplacez cette zone par votre balise &lt;video&gt; ou &lt;iframe&gt;</div>
+      <!-- 
+        EXEMPLE D'INTÉGRATION :
+
+        Vidéo locale :
+        <video controls width="100%" style="border-radius:12px">
+          <source src="votre-video.mp4" type="video/mp4">
+        </video>
+
+        YouTube :
+        <iframe width="100%" height="100%" src="https://www.youtube.com/embed/VOTRE_ID"
+          frameborder="0" allowfullscreen style="border-radius:12px; position:absolute; top:0; left:0;"></iframe>
+      -->
+    </div>
+  </div>
+</div>
+
+<footer>gestion-livraison · React + Node.js + MongoDB · Flux v1.0</footer>
+
+</body>
+</html>
